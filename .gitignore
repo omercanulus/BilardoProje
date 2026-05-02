@@ -1,0 +1,6 @@
+# GitHub uzerine eklenmeyecek dosyalar.
+*.exe
+*.o
+*.out
+.vscode/
+
