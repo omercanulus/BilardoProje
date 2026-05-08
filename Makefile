@@ -1,5 +1,4 @@
 CC = clang
-# Hem M serisi (homebrew) hem Intel Mac yollarini manuel olarak ekliyoruz
 CFLAGS = -Wall -Wextra -I/opt/homebrew/include/SDL2 -I/usr/local/include/SDL2
 LDFLAGS = -L/opt/homebrew/lib -L/usr/local/lib -lSDL2
 
