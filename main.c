@@ -2,15 +2,15 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-// 1. Topun özelliklerini tutacak veri yapısı
+// Top yapisi
 typedef struct
 {
-    float x, y;   // Merkez koordinatları
-    float vx, vy; // Hız (x ve y ekseninde)
-    int radius;   // Yarıçap
+    float x, y;
+    float vx, vy;
+    int radius;
 } Ball;
 
-// 2. İçi dolu çember çizme algoritması (Midpoint Circle Algorithm)
+// Ici dolu cember cizmek icin
 void DrawFilledCircle(SDL_Renderer *renderer, int x0, int y0, int radius)
 {
     int x = radius - 1;
@@ -43,7 +43,6 @@ void DrawFilledCircle(SDL_Renderer *renderer, int x0, int y0, int radius)
 
 int main(int argc, char *argv[])
 {
-    // Derleyicinin kullanılmayan değişken uyarılarını susturmak için:
     (void)argc;
     (void)argv;
 
@@ -69,40 +68,118 @@ int main(int argc, char *argv[])
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == NULL)
     {
-        printf("Cizici olusturulamadi! Hata: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;
     }
 
-    // Beyaz topu masanın sol tarafına yerleştiriyoruz
+    // Top olusturma
     Ball cueBall = {200.0f, 300.0f, 0.0f, 0.0f, 15};
 
     bool isRunning = true;
     SDL_Event event;
 
+    // Fare sürükleme kontrolu degiskenleri
+    bool isDragging = false;
+    int startMouseX = 0, startMouseY = 0;
+
     while (isRunning)
     {
+        // Olaylar
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
             {
                 isRunning = false;
             }
+            // Fare ile vurusa baslama
+            else if (event.type == SDL_MOUSEBUTTONDOWN)
+            {
+                if (event.button.button == SDL_BUTTON_LEFT)
+                {
+                    isDragging = true;
+                    startMouseX = event.button.x;
+                    startMouseY = event.button.y;
+                }
+            }
+            // Vurus bittiginde
+            else if (event.type == SDL_MOUSEBUTTONUP)
+            {
+                if (event.button.button == SDL_BUTTON_LEFT && isDragging)
+                {
+                    isDragging = false;
+                    int endMouseX = event.button.x;
+                    int endMouseY = event.button.y;
+
+                    // Vurusun tersine gonder
+                    // gucu yumusatmak icin 0.5 ile caro
+                    cueBall.vx = (startMouseX - endMouseX) * 0.05f;
+                    cueBall.vy = (startMouseY - endMouseY) * 0.05f;
+                }
+            }
         }
 
-        // 1. Arka planı temizle (Yeşil Çuha)
+        // Fizik hareketleri
+
+        // Hizi pozisyona ekler top hareket eder
+        cueBall.x += cueBall.vx;
+        cueBall.y += cueBall.vy;
+
+        // Surtunme
+        cueBall.vx *= 0.99f;
+        cueBall.vy *= 0.99f;
+
+        // Topun durmasi
+        if (cueBall.vx > -0.02f && cueBall.vx < 0.02f)
+            cueBall.vx = 0.0f;
+        if (cueBall.vy > -0.02f && cueBall.vy < 0.02f)
+            cueBall.vy = 0.0f;
+
+        // Ekran Sinirlari
+        if (cueBall.x - cueBall.radius < 0)
+        {
+            cueBall.x = cueBall.radius;
+            cueBall.vx = -cueBall.vx;
+        }
+        else if (cueBall.x + cueBall.radius > 800)
+        {
+            cueBall.x = 800 - cueBall.radius;
+            cueBall.vx = -cueBall.vx;
+        }
+
+        // Ust ve Alt bantlar
+        if (cueBall.y - cueBall.radius < 0)
+        {
+            cueBall.y = cueBall.radius;
+            cueBall.vy = -cueBall.vy;
+        }
+        else if (cueBall.y + cueBall.radius > 600)
+        {
+            cueBall.y = 600 - cueBall.radius;
+            cueBall.vy = -cueBall.vy;
+        }
+
+        // Cizim
         SDL_SetRenderDrawColor(renderer, 85, 140, 110, 255);
         SDL_RenderClear(renderer);
 
-        // 2. Çizim Rengini Ayarla (Soft Cornsilk Tonu)
-        SDL_SetRenderDrawColor(renderer, 255, 248, 220, 255);
+        // Vurus gosterimi
+        if (isDragging)
+        {
+            int currentMouseX, currentMouseY;
+            SDL_GetMouseState(&currentMouseX, &currentMouseY);
 
-        // 3. Topu Ekrana Çiz
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 150);
+            SDL_RenderDrawLine(renderer, (int)cueBall.x, (int)cueBall.y, currentMouseX, currentMouseY);
+        }
+
+        // Topu ciz
+        SDL_SetRenderDrawColor(renderer, 255, 248, 220, 255);
         DrawFilledCircle(renderer, (int)cueBall.x, (int)cueBall.y, cueBall.radius);
 
-        // 4. Ekrana Yansıt
         SDL_RenderPresent(renderer);
+
+        SDL_Delay(16);
     }
 
     SDL_DestroyRenderer(renderer);
