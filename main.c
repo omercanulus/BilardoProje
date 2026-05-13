@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 
 // top yapisi renkli
 typedef struct
@@ -85,7 +86,6 @@ int main(int argc, char *argv[])
     float startX = 550.0f;
     float startY = 300.0f;
 
-    // toplar arasi bosluk
     float rowSpacing = ballRadius * 1.732f;
     float colSpacing = ballRadius * 2.05f;
 
@@ -97,8 +97,6 @@ int main(int argc, char *argv[])
         for (int col = 0; col <= row; col++)
         {
             float currentY = currentStartY + (col * colSpacing);
-
-            // kirmizi toplar
             balls[index] = (Ball){currentX, currentY, 0.0f, 0.0f, ballRadius, {200, 90, 90, 255}};
             index++;
         }
@@ -107,20 +105,17 @@ int main(int argc, char *argv[])
     bool isRunning = true;
     SDL_Event event;
 
-    // fare surukleme kontrolu degiskenleri
     bool isDragging = false;
     int startMouseX = 0, startMouseY = 0;
 
     while (isRunning)
     {
-        // olaylar
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
             {
                 isRunning = false;
             }
-            // fare ile vurusa baslama
             else if (event.type == SDL_MOUSEBUTTONDOWN)
             {
                 if (event.button.button == SDL_BUTTON_LEFT)
@@ -130,7 +125,6 @@ int main(int argc, char *argv[])
                     startMouseY = event.button.y;
                 }
             }
-            // vurus bittiginde
             else if (event.type == SDL_MOUSEBUTTONUP)
             {
                 if (event.button.button == SDL_BUTTON_LEFT && isDragging)
@@ -139,8 +133,6 @@ int main(int argc, char *argv[])
                     int endMouseX = event.button.x;
                     int endMouseY = event.button.y;
 
-                    // beyaz topa vurus
-                    // vurusun tersine gonder ve gucu yumusat
                     balls[0].vx = (startMouseX - endMouseX) * 0.05f;
                     balls[0].vy = (startMouseY - endMouseY) * 0.05f;
                 }
@@ -150,21 +142,17 @@ int main(int argc, char *argv[])
         // fizik hareketleri 16 top icin
         for (int i = 0; i < 16; i++)
         {
-            // hizi pozisyona ekler top hareket eder
             balls[i].x += balls[i].vx;
             balls[i].y += balls[i].vy;
 
-            // surtunme
             balls[i].vx *= 0.99f;
             balls[i].vy *= 0.99f;
 
-            // topun durmasi
             if (balls[i].vx > -0.02f && balls[i].vx < 0.02f)
                 balls[i].vx = 0.0f;
             if (balls[i].vy > -0.02f && balls[i].vy < 0.02f)
                 balls[i].vy = 0.0f;
 
-            // ekran sinirlari
             if (balls[i].x - balls[i].radius < 0)
             {
                 balls[i].x = balls[i].radius;
@@ -176,7 +164,6 @@ int main(int argc, char *argv[])
                 balls[i].vx = -balls[i].vx;
             }
 
-            // ust ve alt bantlar
             if (balls[i].y - balls[i].radius < 0)
             {
                 balls[i].y = balls[i].radius;
@@ -189,11 +176,47 @@ int main(int argc, char *argv[])
             }
         }
 
+        // toplar arasi carpisma kontrolu ve ic ice gecmeyi engelleme
+        for (int i = 0; i < 16; i++)
+        {
+            for (int j = i + 1; j < 16; j++)
+            {
+                float dx = balls[j].x - balls[i].x;
+                float dy = balls[j].y - balls[i].y;
+                float distance = sqrt(dx * dx + dy * dy);
+                float minDistance = balls[i].radius + balls[j].radius;
+
+                // eger iki top birbirine degiyorsa
+                if (distance < minDistance)
+                {
+                    // mesafenin 0 olma ihtimaline karsi koruma
+                    if (distance == 0.0f)
+                    {
+                        dx = 1.0f;
+                        dy = 0.0f;
+                        distance = 1.0f;
+                    }
+
+                    // ne kadar ic ice girdiklerini bul
+                    float overlap = minDistance - distance;
+
+                    // toplari carpisma yonunde disari it
+                    float nx = dx / distance;
+                    float ny = dy / distance;
+
+                    balls[i].x -= nx * (overlap / 2.0f);
+                    balls[i].y -= ny * (overlap / 2.0f);
+
+                    balls[j].x += nx * (overlap / 2.0f);
+                    balls[j].y += ny * (overlap / 2.0f);
+                }
+            }
+        }
+
         // cizim
         SDL_SetRenderDrawColor(renderer, 85, 140, 110, 255);
         SDL_RenderClear(renderer);
 
-        // vurus gosterimi
         if (isDragging)
         {
             int currentMouseX, currentMouseY;
@@ -202,7 +225,6 @@ int main(int argc, char *argv[])
             SDL_RenderDrawLine(renderer, (int)balls[0].x, (int)balls[0].y, currentMouseX, currentMouseY);
         }
 
-        // toplari ciz
         for (int i = 0; i < 16; i++)
         {
             SDL_SetRenderDrawColor(renderer, balls[i].color.r, balls[i].color.g, balls[i].color.b, balls[i].color.a);
