@@ -2,15 +2,16 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-// Top yapisi
+// top yapisi renkli
 typedef struct
 {
     float x, y;
     float vx, vy;
     int radius;
+    SDL_Color color;
 } Ball;
 
-// Ici dolu cember cizmek icin
+// ici dolu cember cizmek icin
 void DrawFilledCircle(SDL_Renderer *renderer, int x0, int y0, int radius)
 {
     int x = radius - 1;
@@ -60,7 +61,6 @@ int main(int argc, char *argv[])
 
     if (window == NULL)
     {
-        printf("Pencere olusturulamadi. Hata: %s\n", SDL_GetError());
         SDL_Quit();
         return -1;
     }
@@ -73,26 +73,54 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // Top olusturma
-    Ball cueBall = {200.0f, 300.0f, 0.0f, 0.0f, 15};
+    // coklu top dizisi
+    Ball balls[16];
+    int ballRadius = 15;
+
+    // beyaz top olusturma
+    balls[0] = (Ball){200.0f, 300.0f, 0.0f, 0.0f, ballRadius, {255, 248, 220, 255}};
+
+    // diger toplari ucgen dizme
+    int index = 1;
+    float startX = 550.0f;
+    float startY = 300.0f;
+
+    // toplar arasi bosluk
+    float rowSpacing = ballRadius * 1.732f;
+    float colSpacing = ballRadius * 2.05f;
+
+    for (int row = 0; row < 5; row++)
+    {
+        float currentX = startX + (row * rowSpacing);
+        float currentStartY = startY - (row * ballRadius);
+
+        for (int col = 0; col <= row; col++)
+        {
+            float currentY = currentStartY + (col * colSpacing);
+
+            // kirmizi toplar
+            balls[index] = (Ball){currentX, currentY, 0.0f, 0.0f, ballRadius, {200, 90, 90, 255}};
+            index++;
+        }
+    }
 
     bool isRunning = true;
     SDL_Event event;
 
-    // Fare sürükleme kontrolu degiskenleri
+    // fare surukleme kontrolu degiskenleri
     bool isDragging = false;
     int startMouseX = 0, startMouseY = 0;
 
     while (isRunning)
     {
-        // Olaylar
+        // olaylar
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
             {
                 isRunning = false;
             }
-            // Fare ile vurusa baslama
+            // fare ile vurusa baslama
             else if (event.type == SDL_MOUSEBUTTONDOWN)
             {
                 if (event.button.button == SDL_BUTTON_LEFT)
@@ -102,7 +130,7 @@ int main(int argc, char *argv[])
                     startMouseY = event.button.y;
                 }
             }
-            // Vurus bittiginde
+            // vurus bittiginde
             else if (event.type == SDL_MOUSEBUTTONUP)
             {
                 if (event.button.button == SDL_BUTTON_LEFT && isDragging)
@@ -111,74 +139,77 @@ int main(int argc, char *argv[])
                     int endMouseX = event.button.x;
                     int endMouseY = event.button.y;
 
-                    // Vurusun tersine gonder
-                    // gucu yumusatmak icin 0.5 ile caro
-                    cueBall.vx = (startMouseX - endMouseX) * 0.05f;
-                    cueBall.vy = (startMouseY - endMouseY) * 0.05f;
+                    // beyaz topa vurus
+                    // vurusun tersine gonder ve gucu yumusat
+                    balls[0].vx = (startMouseX - endMouseX) * 0.05f;
+                    balls[0].vy = (startMouseY - endMouseY) * 0.05f;
                 }
             }
         }
 
-        // Fizik hareketleri
-
-        // Hizi pozisyona ekler top hareket eder
-        cueBall.x += cueBall.vx;
-        cueBall.y += cueBall.vy;
-
-        // Surtunme
-        cueBall.vx *= 0.99f;
-        cueBall.vy *= 0.99f;
-
-        // Topun durmasi
-        if (cueBall.vx > -0.02f && cueBall.vx < 0.02f)
-            cueBall.vx = 0.0f;
-        if (cueBall.vy > -0.02f && cueBall.vy < 0.02f)
-            cueBall.vy = 0.0f;
-
-        // Ekran Sinirlari
-        if (cueBall.x - cueBall.radius < 0)
+        // fizik hareketleri 16 top icin
+        for (int i = 0; i < 16; i++)
         {
-            cueBall.x = cueBall.radius;
-            cueBall.vx = -cueBall.vx;
-        }
-        else if (cueBall.x + cueBall.radius > 800)
-        {
-            cueBall.x = 800 - cueBall.radius;
-            cueBall.vx = -cueBall.vx;
+            // hizi pozisyona ekler top hareket eder
+            balls[i].x += balls[i].vx;
+            balls[i].y += balls[i].vy;
+
+            // surtunme
+            balls[i].vx *= 0.99f;
+            balls[i].vy *= 0.99f;
+
+            // topun durmasi
+            if (balls[i].vx > -0.02f && balls[i].vx < 0.02f)
+                balls[i].vx = 0.0f;
+            if (balls[i].vy > -0.02f && balls[i].vy < 0.02f)
+                balls[i].vy = 0.0f;
+
+            // ekran sinirlari
+            if (balls[i].x - balls[i].radius < 0)
+            {
+                balls[i].x = balls[i].radius;
+                balls[i].vx = -balls[i].vx;
+            }
+            else if (balls[i].x + balls[i].radius > 800)
+            {
+                balls[i].x = 800 - balls[i].radius;
+                balls[i].vx = -balls[i].vx;
+            }
+
+            // ust ve alt bantlar
+            if (balls[i].y - balls[i].radius < 0)
+            {
+                balls[i].y = balls[i].radius;
+                balls[i].vy = -balls[i].vy;
+            }
+            else if (balls[i].y + balls[i].radius > 600)
+            {
+                balls[i].y = 600 - balls[i].radius;
+                balls[i].vy = -balls[i].vy;
+            }
         }
 
-        // Ust ve Alt bantlar
-        if (cueBall.y - cueBall.radius < 0)
-        {
-            cueBall.y = cueBall.radius;
-            cueBall.vy = -cueBall.vy;
-        }
-        else if (cueBall.y + cueBall.radius > 600)
-        {
-            cueBall.y = 600 - cueBall.radius;
-            cueBall.vy = -cueBall.vy;
-        }
-
-        // Cizim
+        // cizim
         SDL_SetRenderDrawColor(renderer, 85, 140, 110, 255);
         SDL_RenderClear(renderer);
 
-        // Vurus gosterimi
+        // vurus gosterimi
         if (isDragging)
         {
             int currentMouseX, currentMouseY;
             SDL_GetMouseState(&currentMouseX, &currentMouseY);
-
             SDL_SetRenderDrawColor(renderer, 200, 200, 200, 150);
-            SDL_RenderDrawLine(renderer, (int)cueBall.x, (int)cueBall.y, currentMouseX, currentMouseY);
+            SDL_RenderDrawLine(renderer, (int)balls[0].x, (int)balls[0].y, currentMouseX, currentMouseY);
         }
 
-        // Topu ciz
-        SDL_SetRenderDrawColor(renderer, 255, 248, 220, 255);
-        DrawFilledCircle(renderer, (int)cueBall.x, (int)cueBall.y, cueBall.radius);
+        // toplari ciz
+        for (int i = 0; i < 16; i++)
+        {
+            SDL_SetRenderDrawColor(renderer, balls[i].color.r, balls[i].color.g, balls[i].color.b, balls[i].color.a);
+            DrawFilledCircle(renderer, (int)balls[i].x, (int)balls[i].y, balls[i].radius);
+        }
 
         SDL_RenderPresent(renderer);
-
         SDL_Delay(16);
     }
 
