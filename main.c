@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
         }
 
         // toplar arasi carpisma kontrolu ve ic ice gecmeyi engelleme
+        // toplar arasi carpisma kontrolu ve sekme fizigi
         for (int i = 0; i < 16; i++)
         {
             for (int j = i + 1; j < 16; j++)
@@ -189,7 +190,6 @@ int main(int argc, char *argv[])
                 // eger iki top birbirine degiyorsa
                 if (distance < minDistance)
                 {
-                    // mesafenin 0 olma ihtimaline karsi koruma
                     if (distance == 0.0f)
                     {
                         dx = 1.0f;
@@ -197,18 +197,38 @@ int main(int argc, char *argv[])
                         distance = 1.0f;
                     }
 
-                    // ne kadar ic ice girdiklerini bul
+                    // 1. asama: ic ice gecmeyi engelle
                     float overlap = minDistance - distance;
-
-                    // toplari carpisma yonunde disari it
                     float nx = dx / distance;
                     float ny = dy / distance;
 
                     balls[i].x -= nx * (overlap / 2.0f);
                     balls[i].y -= ny * (overlap / 2.0f);
-
                     balls[j].x += nx * (overlap / 2.0f);
                     balls[j].y += ny * (overlap / 2.0f);
+
+                    // 2. asama: hizlari (enerjiyi) takas et
+                    // teget (tangent) vektorlerini bul
+                    float tx = -ny;
+                    float ty = nx;
+
+                    // hizlari normal ve teget eksenine cevir
+                    float dpNorm1 = balls[i].vx * nx + balls[i].vy * ny;
+                    float dpTang1 = balls[i].vx * tx + balls[i].vy * ty;
+
+                    float dpNorm2 = balls[j].vx * nx + balls[j].vy * ny;
+                    float dpTang2 = balls[j].vx * tx + balls[j].vy * ty;
+
+                    // kutleler esit diye hizlar yer degistirir
+                    float dpNorm1New = dpNorm2;
+                    float dpNorm2New = dpNorm1;
+
+                    // yeni hizlari x ve y eksenine geri cevir
+                    balls[i].vx = (tx * dpTang1) + (nx * dpNorm1New);
+                    balls[i].vy = (ty * dpTang1) + (ny * dpNorm1New);
+
+                    balls[j].vx = (tx * dpTang2) + (nx * dpNorm2New);
+                    balls[j].vy = (ty * dpTang2) + (ny * dpNorm2New);
                 }
             }
         }
