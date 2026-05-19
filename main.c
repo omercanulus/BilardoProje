@@ -3,14 +3,22 @@
 #include <stdbool.h>
 #include <math.h>
 
-// top yapisi renkli
+// top yapisi (oyunda olup olmadigini tutmak icin active eklendi)
 typedef struct
 {
     float x, y;
     float vx, vy;
     int radius;
     SDL_Color color;
+    bool active;
 } Ball;
+
+// delik yapisi
+typedef struct
+{
+    int x, y;
+    int radius;
+} Pocket;
 
 // ici dolu cember cizmek icin
 void DrawFilledCircle(SDL_Renderer *renderer, int x0, int y0, int radius)
@@ -74,12 +82,15 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // coklu top dizisi
+    // 6 adet bilardo deligi (kose ve ortalar)
+    Pocket pockets[6] = {
+        {25, 25, 25}, {400, 20, 25}, {775, 25, 25}, {25, 575, 25}, {400, 580, 25}, {775, 575, 25}};
+
     Ball balls[16];
     int ballRadius = 15;
 
-    // beyaz top olusturma
-    balls[0] = (Ball){200.0f, 300.0f, 0.0f, 0.0f, ballRadius, {255, 248, 220, 255}};
+    // beyaz top olusturma (sonda true diyerek oyunda oldugunu belirttik)
+    balls[0] = (Ball){200.0f, 300.0f, 0.0f, 0.0f, ballRadius, {255, 248, 220, 255}, true};
 
     // diger toplari ucgen dizme
     int index = 1;
@@ -97,7 +108,8 @@ int main(int argc, char *argv[])
         for (int col = 0; col <= row; col++)
         {
             float currentY = currentStartY + (col * colSpacing);
-            balls[index] = (Ball){currentX, currentY, 0.0f, 0.0f, ballRadius, {200, 90, 90, 255}};
+            // renkli toplar da baslangicta aktif
+            balls[index] = (Ball){currentX, currentY, 0.0f, 0.0f, ballRadius, {200, 90, 90, 255}, true};
             index++;
         }
     }
@@ -139,12 +151,15 @@ int main(int argc, char *argv[])
             }
         }
 
-        // fizik hareketleri 16 top icin
+        // fizik hareketleri
         for (int i = 0; i < 16; i++)
         {
+            // eger top delige girdiyse fizik islemini atla
+            if (!balls[i].active)
+                continue;
+
             balls[i].x += balls[i].vx;
             balls[i].y += balls[i].vy;
-
             balls[i].vx *= 0.99f;
             balls[i].vy *= 0.99f;
 
@@ -176,18 +191,22 @@ int main(int argc, char *argv[])
             }
         }
 
-        // toplar arasi carpisma kontrolu ve ic ice gecmeyi engelleme
-        // toplar arasi carpisma kontrolu ve sekme fizigi
+        // toplar arasi carpisma
         for (int i = 0; i < 16; i++)
         {
+            if (!balls[i].active)
+                continue; // olmayan top carpisamaz
+
             for (int j = i + 1; j < 16; j++)
             {
+                if (!balls[j].active)
+                    continue;
+
                 float dx = balls[j].x - balls[i].x;
                 float dy = balls[j].y - balls[i].y;
                 float distance = sqrt(dx * dx + dy * dy);
                 float minDistance = balls[i].radius + balls[j].radius;
 
-                // eger iki top birbirine degiyorsa
                 if (distance < minDistance)
                 {
                     if (distance == 0.0f)
@@ -197,7 +216,6 @@ int main(int argc, char *argv[])
                         distance = 1.0f;
                     }
 
-                    // 1. asama: ic ice gecmeyi engelle
                     float overlap = minDistance - distance;
                     float nx = dx / distance;
                     float ny = dy / distance;
@@ -207,28 +225,50 @@ int main(int argc, char *argv[])
                     balls[j].x += nx * (overlap / 2.0f);
                     balls[j].y += ny * (overlap / 2.0f);
 
-                    // 2. asama: hizlari (enerjiyi) takas et
-                    // teget (tangent) vektorlerini bul
                     float tx = -ny;
                     float ty = nx;
 
-                    // hizlari normal ve teget eksenine cevir
                     float dpNorm1 = balls[i].vx * nx + balls[i].vy * ny;
                     float dpTang1 = balls[i].vx * tx + balls[i].vy * ty;
-
                     float dpNorm2 = balls[j].vx * nx + balls[j].vy * ny;
                     float dpTang2 = balls[j].vx * tx + balls[j].vy * ty;
 
-                    // kutleler esit diye hizlar yer degistirir
-                    float dpNorm1New = dpNorm2;
-                    float dpNorm2New = dpNorm1;
+                    balls[i].vx = (tx * dpTang1) + (nx * dpNorm2);
+                    balls[i].vy = (ty * dpTang1) + (ny * dpNorm2);
+                    balls[j].vx = (tx * dpTang2) + (nx * dpNorm1);
+                    balls[j].vy = (ty * dpTang2) + (ny * dpNorm1);
+                }
+            }
+        }
 
-                    // yeni hizlari x ve y eksenine geri cevir
-                    balls[i].vx = (tx * dpTang1) + (nx * dpNorm1New);
-                    balls[i].vy = (ty * dpTang1) + (ny * dpNorm1New);
+        // deliklere dusme kontrolu
+        for (int i = 0; i < 16; i++)
+        {
+            if (!balls[i].active)
+                continue;
 
-                    balls[j].vx = (tx * dpTang2) + (nx * dpNorm2New);
-                    balls[j].vy = (ty * dpTang2) + (ny * dpNorm2New);
+            for (int p = 0; p < 6; p++)
+            {
+                float dx = balls[i].x - pockets[p].x;
+                float dy = balls[i].y - pockets[p].y;
+                float dist = sqrt(dx * dx + dy * dy);
+
+                // eger top deligin icindeyse
+                if (dist < pockets[p].radius)
+                {
+                    if (i == 0)
+                    {
+                        // beyaz top dustuyse ceza (baslangica geri koy)
+                        balls[0].x = 200.0f;
+                        balls[0].y = 300.0f;
+                        balls[0].vx = 0.0f;
+                        balls[0].vy = 0.0f;
+                    }
+                    else
+                    {
+                        // renkli top dustuyse oyundan cikar
+                        balls[i].active = false;
+                    }
                 }
             }
         }
@@ -236,6 +276,13 @@ int main(int argc, char *argv[])
         // cizim
         SDL_SetRenderDrawColor(renderer, 85, 140, 110, 255);
         SDL_RenderClear(renderer);
+
+        // once delikleri ciz (siyah renk)
+        SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
+        for (int p = 0; p < 6; p++)
+        {
+            DrawFilledCircle(renderer, pockets[p].x, pockets[p].y, pockets[p].radius);
+        }
 
         if (isDragging)
         {
@@ -245,10 +292,14 @@ int main(int argc, char *argv[])
             SDL_RenderDrawLine(renderer, (int)balls[0].x, (int)balls[0].y, currentMouseX, currentMouseY);
         }
 
+        // sadece aktif olan toplari ciz
         for (int i = 0; i < 16; i++)
         {
-            SDL_SetRenderDrawColor(renderer, balls[i].color.r, balls[i].color.g, balls[i].color.b, balls[i].color.a);
-            DrawFilledCircle(renderer, (int)balls[i].x, (int)balls[i].y, balls[i].radius);
+            if (balls[i].active)
+            {
+                SDL_SetRenderDrawColor(renderer, balls[i].color.r, balls[i].color.g, balls[i].color.b, balls[i].color.a);
+                DrawFilledCircle(renderer, (int)balls[i].x, (int)balls[i].y, balls[i].radius);
+            }
         }
 
         SDL_RenderPresent(renderer);
