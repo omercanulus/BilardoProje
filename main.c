@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <math.h>
 
-// top yapisi (oyunda olup olmadigini tutmak icin active eklendi)
+// top yapisi
 typedef struct
 {
     float x, y;
@@ -20,7 +20,7 @@ typedef struct
     int radius;
 } Pocket;
 
-// ici dolu cember cizmek icin
+// ici dolu cember cizimi
 void DrawFilledCircle(SDL_Renderer *renderer, int x0, int y0, int radius)
 {
     int x = radius - 1;
@@ -58,7 +58,6 @@ int main(int argc, char *argv[])
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
-        printf("SDL Baslatilamadi! Hata: %s\n", SDL_GetError());
         return -1;
     }
 
@@ -82,21 +81,20 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // 6 adet bilardo deligi (kose ve ortalar)
+    // delikler
     Pocket pockets[6] = {
         {25, 25, 25}, {400, 20, 25}, {775, 25, 25}, {25, 575, 25}, {400, 580, 25}, {775, 575, 25}};
 
     Ball balls[16];
     int ballRadius = 15;
 
-    // beyaz top olusturma (sonda true diyerek oyunda oldugunu belirttik)
+    // beyaz top
     balls[0] = (Ball){200.0f, 300.0f, 0.0f, 0.0f, ballRadius, {255, 248, 220, 255}, true};
 
-    // diger toplari ucgen dizme
+    // renkli toplari dizme
     int index = 1;
     float startX = 550.0f;
     float startY = 300.0f;
-
     float rowSpacing = ballRadius * 1.732f;
     float colSpacing = ballRadius * 2.05f;
 
@@ -108,7 +106,6 @@ int main(int argc, char *argv[])
         for (int col = 0; col <= row; col++)
         {
             float currentY = currentStartY + (col * colSpacing);
-            // renkli toplar da baslangicta aktif
             balls[index] = (Ball){currentX, currentY, 0.0f, 0.0f, ballRadius, {200, 90, 90, 255}, true};
             index++;
         }
@@ -132,9 +129,13 @@ int main(int argc, char *argv[])
             {
                 if (event.button.button == SDL_BUTTON_LEFT)
                 {
-                    isDragging = true;
-                    startMouseX = event.button.x;
-                    startMouseY = event.button.y;
+                    // sadece beyaz top aktifse vurusa izin ver
+                    if (balls[0].active)
+                    {
+                        isDragging = true;
+                        startMouseX = event.button.x;
+                        startMouseY = event.button.y;
+                    }
                 }
             }
             else if (event.type == SDL_MOUSEBUTTONUP)
@@ -151,10 +152,9 @@ int main(int argc, char *argv[])
             }
         }
 
-        // fizik hareketleri
+        // fizik
         for (int i = 0; i < 16; i++)
         {
-            // eger top delige girdiyse fizik islemini atla
             if (!balls[i].active)
                 continue;
 
@@ -191,11 +191,11 @@ int main(int argc, char *argv[])
             }
         }
 
-        // toplar arasi carpisma
+        // carpisma
         for (int i = 0; i < 16; i++)
         {
             if (!balls[i].active)
-                continue; // olmayan top carpisamaz
+                continue;
 
             for (int j = i + 1; j < 16; j++)
             {
@@ -241,7 +241,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        // deliklere dusme kontrolu
+        // delik kontrol
         for (int i = 0; i < 16; i++)
         {
             if (!balls[i].active)
@@ -253,12 +253,10 @@ int main(int argc, char *argv[])
                 float dy = balls[i].y - pockets[p].y;
                 float dist = sqrt(dx * dx + dy * dy);
 
-                // eger top deligin icindeyse
                 if (dist < pockets[p].radius)
                 {
                     if (i == 0)
                     {
-                        // beyaz top dustuyse ceza (baslangica geri koy)
                         balls[0].x = 200.0f;
                         balls[0].y = 300.0f;
                         balls[0].vx = 0.0f;
@@ -266,33 +264,59 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        // renkli top dustuyse oyundan cikar
                         balls[i].active = false;
                     }
                 }
             }
         }
 
-        // cizim
+        // cizim motoru
         SDL_SetRenderDrawColor(renderer, 85, 140, 110, 255);
         SDL_RenderClear(renderer);
 
-        // once delikleri ciz (siyah renk)
+        // delikler
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         for (int p = 0; p < 6; p++)
         {
             DrawFilledCircle(renderer, pockets[p].x, pockets[p].y, pockets[p].radius);
         }
 
+        // dinamik istaka cizimi (trigonometri ile)
         if (isDragging)
         {
-            int currentMouseX, currentMouseY;
-            SDL_GetMouseState(&currentMouseX, &currentMouseY);
-            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 150);
-            SDL_RenderDrawLine(renderer, (int)balls[0].x, (int)balls[0].y, currentMouseX, currentMouseY);
+            int mx, my;
+            SDL_GetMouseState(&mx, &my);
+
+            float dx = mx - balls[0].x;
+            float dy = my - balls[0].y;
+            float angle = atan2(dy, dx);
+            float pullDist = sqrt(dx * dx + dy * dy); // fareyi ne kadar cektik
+
+            // istaka uzunlugu ve toptan uzakligi (geriye cekme hissi)
+            float cueLength = 120.0f;
+            float offset = balls[0].radius + 10.0f + (pullDist * 0.3f);
+
+            // istakanin ucu ve arkasi
+            float startX = balls[0].x + cos(angle) * offset;
+            float startY = balls[0].y + sin(angle) * offset;
+            float endX = balls[0].x + cos(angle) * (offset + cueLength);
+            float endY = balls[0].y + sin(angle) * (offset + cueLength);
+
+            // ahsap rengi (peru color)
+            SDL_SetRenderDrawColor(renderer, 205, 133, 63, 255);
+
+            // kalinlik vermek icin yan yana 5 cizgi ciziyoruz
+            for (int w = -2; w <= 2; w++)
+            {
+                int px1 = startX + cos(angle + M_PI / 2) * w;
+                int py1 = startY + sin(angle + M_PI / 2) * w;
+                int px2 = endX + cos(angle + M_PI / 2) * w;
+                int py2 = endY + sin(angle + M_PI / 2) * w;
+                SDL_RenderDrawLine(renderer, px1, py1, px2, py2);
+            }
         }
 
-        // sadece aktif olan toplari ciz
+        // toplar
         for (int i = 0; i < 16; i++)
         {
             if (balls[i].active)
